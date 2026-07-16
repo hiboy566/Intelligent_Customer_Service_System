@@ -1,0 +1,69 @@
+### Qwen3-VL-8B QLoRA training (RTX 4090 24 GB)
+
+### model
+model_name_or_path: /model/ModelScope/Qwen/Qwen3-VL-8B-Instruct
+quantization_bit: 4
+quantization_method: bnb
+quantization_type: nf4
+double_quantization: true
+upcast_layernorm: true
+trust_remote_code: true
+flash_attn: sdpa
+image_max_pixels: 262144
+video_max_pixels: 16384
+
+### method
+stage: sft
+do_train: true
+do_eval: true
+finetuning_type: lora
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target: all
+freeze_vision_tower: true
+freeze_multi_modal_projector: true
+
+### dataset
+dataset_dir: ./datasets
+dataset: customer_service_train
+eval_dataset: customer_service_validation
+template: qwen3_vl_nothink
+cutoff_len: 512
+max_samples: 500
+overwrite_cache: true
+preprocessing_num_workers: 4
+dataloader_num_workers: 0
+
+### output
+output_dir: ./artifacts/qwen3-vl-8b/qlora/train-v1
+logging_steps: 5
+eval_strategy: steps
+eval_steps: 125
+save_strategy: steps
+save_steps: 125
+save_total_limit: 2
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+report_to: none
+
+### train
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 4
+eval_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_steps: 20
+bf16: true
+gradient_checkpointing: true
+optim: paged_adamw_8bit
+max_grad_norm: 1.0
+seed: 42
+ddp_timeout: 180000000
+resume_from_checkpoint: null

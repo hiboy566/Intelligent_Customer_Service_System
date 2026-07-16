@@ -9,6 +9,17 @@
 - `datasets/`：允许公开的数据集或数据说明。
 - `artifacts/`：模型权重、日志和评测结果。
 
+## 客服数据集
+
+`datasets/` 已准备 LLaMA-Factory Alpaca 格式的合成中文客服数据：
+
+- 50 条 smoke test 数据；
+- 500 条训练数据；
+- 100 条校验数据。
+
+数据覆盖 25 类常见电商客服意图，详情和使用方式见 `datasets/README.md`。可通过
+`python scripts/generate_customer_service_datasets.py` 确定性地重新生成。
+
 ## 记录一次训练
 
 1. 复制 `training_runs/TEMPLATE.md` 到 `training_runs/YYYY-MM-DD_run-name/README.md`。

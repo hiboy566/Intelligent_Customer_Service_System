@@ -1,0 +1,20 @@
+{
+  "count": 100,
+  "normalized_exact_match": 0.99,
+  "normalized_exact_match_count": 99,
+  "empty_prediction_count": 0,
+  "special_token_leak_count": 0,
+  "identifier_grounding_rate": 0.99,
+  "identifier_grounding_count": 99,
+  "identifier_reference_match_rate": 0.99,
+  "identifier_reference_match_count": 99,
+  "prediction_chars_min": 92,
+  "prediction_chars_mean": 106.07,
+  "prediction_chars_max": 119,
+  "non_exact_indices": [
+    7
+  ],
+  "ungrounded_identifier_indices": [
+    7
+  ]
+}
