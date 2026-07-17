@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -81,12 +82,13 @@ class ModelRuntime:
 
     def generate(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         max_tokens: int,
         temperature: float,
         top_p: float,
         repetition_penalty: float,
+        tools: list[dict[str, Any]] | None = None,
     ) -> tuple[str, int, int]:
         if (
             self.model is None
@@ -96,8 +98,9 @@ class ModelRuntime:
         ):
             raise RuntimeError("model runtime is not loaded")
 
+        normalized_messages = normalize_messages(messages, tools)
         prompt = self.processor.apply_chat_template(
-            messages,
+            normalized_messages,
             tokenize=False,
             add_generation_prompt=True,
             enable_thinking=False,
@@ -142,3 +145,56 @@ class ModelRuntime:
 
 class GpuOutOfMemoryError(RuntimeError):
     """Raised after clearing the CUDA allocator following an inference OOM."""
+
+
+def normalize_messages(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
+) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+    if tools:
+        catalog = [tool["function"] for tool in tools]
+        normalized.append(
+            {
+                "role": "system",
+                "content": (
+                    "你可以使用后端工具。工具定义如下：\n"
+                    f"{json.dumps(catalog, ensure_ascii=False)}\n"
+                    "需要调用工具时，只输出 JSON："
+                    '{"tool_calls":[{"name":"工具名","arguments":{}}]}。'
+                    "不需要工具或已获得工具结果时，只输出 JSON："
+                    '{"answer":"给用户的最终答复"}。'
+                    "不得编造工具返回值、订单状态、退款状态或工单编号。"
+                ),
+            }
+        )
+
+    for message in messages:
+        role = message["role"]
+        if role == "tool":
+            normalized.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"工具 {message.get('name') or message.get('tool_call_id') or 'unknown'} "
+                        f"执行结果：{message.get('content') or ''}"
+                    ),
+                }
+            )
+        elif role == "assistant" and message.get("tool_calls"):
+            normalized.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        {"tool_calls": message["tool_calls"]}, ensure_ascii=False
+                    ),
+                }
+            )
+        else:
+            normalized.append(
+                {
+                    "role": role,
+                    "content": message.get("content") or "",
+                }
+            )
+    return normalized

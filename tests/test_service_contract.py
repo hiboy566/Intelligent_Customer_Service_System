@@ -12,7 +12,7 @@ def fake_load(runtime: ModelRuntime) -> None:
 
 def fake_generate(
     runtime: ModelRuntime,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, object]],
     **_: object,
 ) -> tuple[str, int, int]:
     assert messages[-1]["role"] == "user"
@@ -51,4 +51,47 @@ def test_health_and_chat_contract(monkeypatch) -> None:
             "prompt_tokens": 20,
             "completion_tokens": 12,
             "total_tokens": 32,
+        }
+
+
+def test_openai_tool_call_response(monkeypatch) -> None:
+    monkeypatch.delenv("SERVICE_API_KEY", raising=False)
+    monkeypatch.setattr(ModelRuntime, "load", fake_load)
+    monkeypatch.setattr(
+        ModelRuntime,
+        "generate",
+        lambda *_args, **_kwargs: (
+            '{"tool_calls":[{"name":"query_order","arguments":{"order_id":"TEST-01-021"}}]}',
+            50,
+            20,
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [{"role": "user", "content": "查订单 TEST-01-021"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "query_order",
+                            "description": "查询订单",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"order_id": {"type": "string"}},
+                                "required": ["order_id"],
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 200
+        choice = response.json()["choices"][0]
+        assert choice["finish_reason"] == "tool_calls"
+        assert choice["message"]["tool_calls"][0]["function"] == {
+            "name": "query_order",
+            "arguments": '{"order_id": "TEST-01-021"}',
         }

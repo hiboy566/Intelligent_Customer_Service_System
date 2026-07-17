@@ -10,6 +10,7 @@
 - `artifacts/`：模型权重、日志和评测结果。
 - `models/`：本地 adapter 文件。
 - `service/`：FastAPI + PyTorch QLoRA 推理接口。
+- `mastra-agent/`：调用 QLoRA 接口并使用 mock 后端 tools 的 Mastra Agent。
 
 ## 客服数据集
 
@@ -39,6 +40,12 @@ uvicorn service.app:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
 安装、环境变量和请求示例见 `service/README.md`。
+
+## Mastra Agent
+
+`mastra-agent/` 使用 OpenAI-compatible provider 调用本地 QLoRA 接口，并通过
+Mastra tools 查询 mock 订单、物流、退款和创建工单。启动方式见
+`mastra-agent/README.md`。
 
 ## 大文件
 

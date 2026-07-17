@@ -201,6 +201,8 @@ cython_debug/
 #   you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 .DS_Store
+node_modules/
+.mastra/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 

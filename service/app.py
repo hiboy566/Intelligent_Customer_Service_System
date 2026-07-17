@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
+import re
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -15,6 +17,8 @@ from service.schemas import (
     ChatCompletionResponse,
     ChatMessage,
     HealthResponse,
+    ToolCall,
+    ToolCallFunction,
     Usage,
 )
 
@@ -85,19 +89,24 @@ async def chat_completions(
                 temperature=payload.temperature,
                 top_p=payload.top_p,
                 repetition_penalty=payload.repetition_penalty,
+                tools=[tool.model_dump() for tool in payload.tools]
+                if payload.tools
+                else None,
             )
         except GpuOutOfMemoryError as error:
             raise HTTPException(status_code=503, detail="GPU out of memory") from error
         except Exception as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
 
+    response_message, finish_reason = build_assistant_message(text, payload)
     return ChatCompletionResponse(
         id=f"chatcmpl-{uuid.uuid4().hex}",
         created=int(time.time()),
         model=payload.model or runtime.settings.model_alias,
         choices=[
             ChatChoice(
-                message=ChatMessage(role="assistant", content=text),
+                message=response_message,
+                finish_reason=finish_reason,
             )
         ],
         usage=Usage(
@@ -106,3 +115,53 @@ async def chat_completions(
             total_tokens=prompt_tokens + completion_tokens,
         ),
     )
+
+
+def build_assistant_message(
+    text: str,
+    payload: ChatCompletionRequest,
+) -> tuple[ChatMessage, str]:
+    if not payload.tools:
+        return ChatMessage(role="assistant", content=text), "stop"
+
+    parsed = extract_json_object(text)
+    if isinstance(parsed, dict) and isinstance(parsed.get("tool_calls"), list):
+        available = {tool.function.name for tool in payload.tools}
+        tool_calls: list[ToolCall] = []
+        for index, call in enumerate(parsed["tool_calls"]):
+            if not isinstance(call, dict) or call.get("name") not in available:
+                continue
+            arguments = call.get("arguments", {})
+            tool_calls.append(
+                ToolCall(
+                    id=f"call_{uuid.uuid4().hex}_{index}",
+                    function=ToolCallFunction(
+                        name=call["name"],
+                        arguments=json.dumps(arguments, ensure_ascii=False),
+                    ),
+                )
+            )
+        if tool_calls:
+            return (
+                ChatMessage(role="assistant", content=None, tool_calls=tool_calls),
+                "tool_calls",
+            )
+
+    if isinstance(parsed, dict) and isinstance(parsed.get("answer"), str):
+        return ChatMessage(role="assistant", content=parsed["answer"].strip()), "stop"
+    return ChatMessage(role="assistant", content=text), "stop"
+
+
+def extract_json_object(text: str) -> dict[str, object] | None:
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(cleaned):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(cleaned[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
