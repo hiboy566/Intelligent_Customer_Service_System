@@ -8,6 +8,8 @@
 - `training_runs/`：每次训练的独立记录。
 - `datasets/`：允许公开的数据集或数据说明。
 - `artifacts/`：模型权重、日志和评测结果。
+- `models/`：本地 adapter 文件。
+- `service/`：FastAPI + PyTorch QLoRA 推理接口。
 
 ## 客服数据集
 
@@ -26,6 +28,17 @@
 2. 保存实际使用的配置、代码提交号、数据版本和环境信息。
 3. 训练结束后补充指标、结论和模型产物路径。
 4. 提交并推送到 GitHub。
+
+## QLoRA 推理接口
+
+本地 adapter 位于 `models/qwen3-vl-8b-qlora-train-v1/`。服务会以 4-bit NF4
+加载 Qwen3-VL-8B-Instruct 基座模型，再挂载 PEFT adapter：
+
+```bash
+uvicorn service.app:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+安装、环境变量和请求示例见 `service/README.md`。
 
 ## 大文件
 
