@@ -11,6 +11,7 @@
     "build": "mastra build",
     "start": "mastra start",
     "mock": "tsx src/mock-backend/server.ts",
+    "mock:qlora": "tsx src/mock-qlora/server.ts",
     "chat": "tsx src/chat.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

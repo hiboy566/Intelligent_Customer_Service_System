@@ -44,6 +44,7 @@ class ChatCompletionRequest(BaseModel):
     repetition_penalty: float = Field(default=1.0, ge=0.5, le=2.0)
     tools: list[ChatTool] | None = None
     tool_choice: str | dict[str, Any] | None = None
+    stream: bool = False
 
 
 class Usage(BaseModel):

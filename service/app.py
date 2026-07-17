@@ -9,6 +9,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from service.model_runtime import GpuOutOfMemoryError, ModelRuntime, Settings
 from service.schemas import (
@@ -76,7 +77,7 @@ async def health(request: Request) -> HealthResponse:
 async def chat_completions(
     payload: ChatCompletionRequest,
     request: Request,
-) -> ChatCompletionResponse:
+):
     runtime: ModelRuntime = request.app.state.runtime
     messages = [message.model_dump() for message in payload.messages]
 
@@ -99,7 +100,7 @@ async def chat_completions(
             raise HTTPException(status_code=500, detail=str(error)) from error
 
     response_message, finish_reason = build_assistant_message(text, payload)
-    return ChatCompletionResponse(
+    response = ChatCompletionResponse(
         id=f"chatcmpl-{uuid.uuid4().hex}",
         created=int(time.time()),
         model=payload.model or runtime.settings.model_alias,
@@ -115,6 +116,13 @@ async def chat_completions(
             total_tokens=prompt_tokens + completion_tokens,
         ),
     )
+    if payload.stream:
+        return StreamingResponse(
+            stream_chat_completion(response),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    return response
 
 
 def build_assistant_message(
@@ -165,3 +173,29 @@ def extract_json_object(text: str) -> dict[str, object] | None:
         if isinstance(value, dict):
             return value
     return None
+
+
+async def stream_chat_completion(response: ChatCompletionResponse):
+    choice = response.choices[0]
+    message = choice.message
+    delta = message.model_dump(
+        exclude_none=True,
+        exclude={"role"} if message.tool_calls is None else set(),
+    )
+    delta["role"] = "assistant"
+    chunk = {
+        "id": response.id,
+        "object": "chat.completion.chunk",
+        "created": response.created,
+        "model": response.model,
+        "choices": [
+            {
+                "index": 0,
+                "delta": delta,
+                "finish_reason": choice.finish_reason,
+            }
+        ],
+        "usage": response.usage.model_dump(),
+    }
+    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+    yield "data: [DONE]\n\n"

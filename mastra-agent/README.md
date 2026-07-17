@@ -43,6 +43,15 @@ npm run mock
 npm run dev
 ```
 
+If the CUDA QLoRA server is unavailable, a clearly identified local protocol stub can
+be used to test only the Mastra and tools integration:
+
+```bash
+npm run mock:qlora
+```
+
+The stub must never be used for model-quality evaluation or production traffic.
+
 Mastra Studio and its agent API are then available from the URL printed by `mastra
 dev` (normally port 4111). A direct CLI smoke request can be sent with:
 

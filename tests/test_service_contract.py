@@ -95,3 +95,22 @@ def test_openai_tool_call_response(monkeypatch) -> None:
             "name": "query_order",
             "arguments": '{"order_id": "TEST-01-021"}',
         }
+
+
+def test_openai_sse_stream_response(monkeypatch) -> None:
+    monkeypatch.delenv("SERVICE_API_KEY", raising=False)
+    monkeypatch.setattr(ModelRuntime, "load", fake_load)
+    monkeypatch.setattr(ModelRuntime, "generate", fake_generate)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [{"role": "user", "content": "查物流"}],
+                "stream": True,
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        assert '"object": "chat.completion.chunk"' in response.text
+        assert response.text.rstrip().endswith("data: [DONE]")
